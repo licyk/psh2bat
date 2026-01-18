@@ -54,12 +54,12 @@ if "%{{WorkPath}}:~-1%"=="\" set "{{WorkPath}}=%{{WorkPath}}:~0,-1%"
 set "BAT_SCRIPT_ROOT=%{{WorkPath}}%"
 set "{{DefaultPowerShellExecutable}}={{DefaultPowerShellExecutableVal}}"
 if "%{{DefaultPowerShellExecutable}}%" == "" (
-    where powershell >nul 2>1
+    where powershell >nul 2>&1
     if %ERRORLEVEL% == 0 (
         set "{{PowerShellExecutable}}=powershell"
         goto :ExecCode
     )
-    where pwsh >nul 2>1
+    where pwsh >nul 2>&1
     if %ERRORLEVEL% == 0 (
         set "{{PowerShellExecutable}}=pwsh"
         goto :ExecCode

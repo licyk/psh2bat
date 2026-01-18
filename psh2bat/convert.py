@@ -212,13 +212,14 @@ function Main {
     try {
         $psh_code = Get-PowerShell-Code -ScriptPath $BatchPath -Prefix "{{POWERSHELL_CODE_FLAG}}"
         Set-Content -Value $psh_code -Path $temp_script_path -Encoding $psh_script_encoding -Force
+        $extra_args = Get-ExtraArgs
         $Env:{{BatFilePath}} = $null
         $Env:{{BatFilePathP}} = $null
         $Env:{{WorkPath}} = $null
         $Env:{{POWERSHELL_CODE_ARGS_FLAG}} = $null
         $Env:{{DefaultPowerShellExecutable}} = $null
         $Env:{{PowerShellExecutable}} = $null
-        Invoke-Expression "& `"$temp_script_path`" $(Get-ExtraArgs)"
+        Invoke-Expression "& `"$temp_script_path`" $extra_args"
     }
     finally {
         $tmp.Dispose()

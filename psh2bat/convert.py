@@ -1,6 +1,7 @@
 """代码转换工具"""
 
 import re
+from typing import Any
 
 from psh2bat.utils import generate_random_string
 
@@ -202,7 +203,8 @@ Main
         .strip()
     )
 
-    return content
+    # 此时的 PSScriptRoot 变量无法正确表示当前路径, 需要替换为 $Env:BAT_SCRIPT_ROOT
+    return replace_ps_root_to_env(content)
 
 
 def find_powershell_exec_markers(text: str) -> list[str]:
@@ -234,4 +236,62 @@ def extract_psh_code_from_bat(code: str) -> str | None:
     if not markers:
         return None
 
-    return code.split(markers[0])[1].strip()
+    # 将 $Env:BAT_SCRIPT_ROOT 还原回的 PSScriptRoot 变量
+    return replace_env_to_ps_root(code.split(markers[0])[1].strip())
+
+
+def replace_ps_root_to_env(text: str) -> str:
+    """将 $PSScriptRoot 替换为 $Env:BAT_SCRIPT_ROOT, 跳过单引号和反引号转义
+
+    Args:
+        text: 原始代码字符串
+    Returns:
+        str: 替换后的字符串
+    """
+    # 模式说明:
+    # 1. ('.*?') : 匹配单引号字符串（捕获组1）
+    # 2. (`\$\{.*?\}`|`\$\w+): 匹配反引号转义的变量（捕获组2）
+    # 3. \$\{(?:(\w+):)?PSScriptRoot\} : 匹配带花括号的变量（捕获组3）
+    # 4. \$(?:(\w+):)?PSScriptRoot\b : 匹配普通变量（捕获组4）
+    pattern = r"('.*?')|(`\$(?:\{.*?\})?|`\$\w+)|(\$\{(?:\w+:)?PSScriptRoot\})|(\$(?:\w+:)?PSScriptRoot\b)"
+
+    def subst(match: re.Match) -> Any:
+        # 如果是单引号字符串或转义字符，原样返回
+        if match.group(1) or match.group(2):
+            return match.group(0)
+        # 如果是带花括号的格式
+        if match.group(3):
+            return "${Env:BAT_SCRIPT_ROOT}"
+        # 如果是不带花括号的格式
+        if match.group(4):
+            return "$Env:BAT_SCRIPT_ROOT"
+        return match.group(0)
+
+    return re.sub(pattern, subst, text, flags=re.DOTALL)
+
+
+def replace_env_to_ps_root(text: str) -> str:
+    """将 $Env:BAT_SCRIPT_ROOT 还原为 $PSScriptRoot, 跳过单引号和反引号转义
+
+    Args:
+        text: 原始代码字符串
+    Returns:
+        str: 替换后的字符串
+    """
+    # 模式说明：
+    # 1. ('.*?') : 匹配单引号字符串
+    # 2. (`\$\{.*?\}`|`\$\w+): 匹配反引号转义
+    # 3. \$\{Env:BAT_SCRIPT_ROOT\} : 目标带括号格式
+    # 4. \$Env:BAT_SCRIPT_ROOT\b : 目标普通格式
+    pattern = r"('.*?')|(`\$(?:\{.*?\})?|`\$\w+)|(\$\{Env:BAT_SCRIPT_ROOT\})|(\$Env:BAT_SCRIPT_ROOT\b)"
+
+    def subst(match: re.Match) -> Any:
+        if match.group(1) or match.group(2):
+            return match.group(0)
+        if match.group(3):
+            return "${PSScriptRoot}"
+        if match.group(4):
+            return "$PSScriptRoot"
+        return match.group(0)
+
+    return re.sub(pattern, subst, text, flags=re.DOTALL)

@@ -4,6 +4,18 @@ import re
 from typing import Any
 
 from psh2bat.utils import generate_random_string
+from psh2bat.config import (
+    LOGGER_NAME,
+    LOGGER_LEVEL,
+    LOGGER_COLOR,
+)
+from psh2bat.logger import get_logger
+
+logger = get_logger(
+    name=LOGGER_NAME,
+    level=LOGGER_LEVEL,
+    color=LOGGER_COLOR,
+)
 
 
 def psh_to_bat_code(code: str) -> str:
@@ -19,6 +31,7 @@ def psh_to_bat_code(code: str) -> str:
         flag = f"__{base_name}_{generate_random_string()}__"
         while flag in code:
             flag = f"__{base_name}_{generate_random_string()}__"
+        logger.debug("'%s' 对应的替换值: '%s'", base_name, flag)
         return flag
 
     psh_exec_flag = _generate_unique_flag("PowerShellCodeExec")
@@ -174,6 +187,10 @@ function Main {
     try {
         $psh_code = Get-PowerShell-Code -ScriptPath $BatchPath -Prefix "{{POWERSHELL_CODE_FLAG}}"
         Set-Content -Value $psh_code -Path $temp_script_path -Encoding $psh_script_encoding -Force
+        $Env:{{BatFilePath}} = $null
+        $Env:{{BatFilePathP}} = $null
+        $Env:{{WorkPath}} = $null
+        $Env:{{POWERSHELL_CODE_ARGS_FLAG}} = $null
         Invoke-Expression "& `"$temp_script_path`" $(Get-ExtraArgs)"
     }
     finally {
@@ -208,7 +225,7 @@ Main
 
 
 def find_powershell_exec_markers(text: str) -> list[str]:
-    """使用正则表达式查找文本中的 PowerShell 执行标记
+    """使用正则表达式查找文本中的 PowerShell 代码标记
 
     Args:
         text (str): 要搜索的文本
@@ -220,6 +237,7 @@ def find_powershell_exec_markers(text: str) -> list[str]:
     # [^:]* 表示任意数量的非冒号字符
     pattern = r":__PowerShellCode_[^:]*__:"
     matches = re.findall(pattern, text)
+    logger.debug("查找到的 PowerShell 代码标记: %s", matches)
     return matches
 
 

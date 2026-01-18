@@ -23,15 +23,19 @@ def psh_to_bat_code(code: str) -> str:
     psh_exec_flag = _generate_unique_flag("PowerShellCodeExec")
     psh_code_flag = _generate_unique_flag("PowerShellCode")
     psh_code_args_flag = _generate_unique_flag("POWERSHELL_CODE_ARG")
+    bat_file_path_flag = _generate_unique_flag("BatFilePath")
+    bat_file_path_p_flag = _generate_unique_flag("BatFilePathP")
+    work_path_flag = _generate_unique_flag("WorkPath")
     content = r"""
 @echo off
 @setlocal DisableDelayedExpansion
-set "_bat_file_path_=%~f0"
-set "_bat_file_path_p_=%_bat_file_path_:'=''%"
-set "_work_path_=%~dp0"
+set "{{BatFilePath}}=%~f0"
+set "{{BatFilePathP}}=%{{BatFilePath}}:'=''%"
+set "{{WorkPath}}=%~dp0"
 set "{{POWERSHELL_CODE_ARGS_FLAG}}=%*"
-if "%_work_path_:~-1%"=="\" set "_work_path_=%_work_path_:~0,-1%"
-cmd /c "powershell -ExecutionPolicy Bypass -nop -c ""$f = [System.IO.File]::ReadAllText('%_bat_file_path_p_%') -split ':{{POWERSHELL_CODE_EXEC_FLAG}}\:.*'; . ([scriptblock]::Create($f[1])) -BatchPath '%_bat_file_path_p_%'" "
+if "%{{WorkPath}}:~-1%"=="\" set "{{WorkPath}}=%{{WorkPath}}:~0,-1%"
+set "BAT_SCRIPT_ROOT=%{{WorkPath}}%"
+cmd /c "powershell -ExecutionPolicy Bypass -nop -c ""$f = [System.IO.File]::ReadAllText('%{{BatFilePathP}}%') -split ':{{POWERSHELL_CODE_EXEC_FLAG}}\:.*'; . ([scriptblock]::Create($f[1])) -BatchPath '%{{BatFilePathP}}%'" "
 if !errorlevel!==0 (
     set "_psh_exit_code_=0"
 ) else (
@@ -191,6 +195,9 @@ Main
         content.replace("{{POWERSHELL_CODE_EXEC_FLAG}}", psh_exec_flag)
         .replace("{{POWERSHELL_CODE_FLAG}}", psh_code_flag)
         .replace("{{POWERSHELL_CODE_ARGS_FLAG}}", psh_code_args_flag)
+        .replace("{{BatFilePath}}", bat_file_path_flag)
+        .replace("{{BatFilePathP}}", bat_file_path_p_flag)
+        .replace("{{WorkPath}}", work_path_flag)
         .replace("{{POWERSHELL_CODE}}", code)
         .strip()
     )

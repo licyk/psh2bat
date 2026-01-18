@@ -18,11 +18,12 @@ logger = get_logger(
 )
 
 
-def psh_to_bat_code(code: str) -> str:
+def psh_to_bat_code(code: str, executable: str | None = None) -> str:
     """将 PowerShell 代码嵌入到 Batch 脚本代码中
 
     Args:
         code (str): PowerShell 脚本代码
+        executable (str | None): 默认执行代码的 PowerShell 脚本解释器
     Returns:
         str: Batch 脚本代码
     """
@@ -40,6 +41,8 @@ def psh_to_bat_code(code: str) -> str:
     bat_file_path_flag = _generate_unique_flag("BatFilePath")
     bat_file_path_p_flag = _generate_unique_flag("BatFilePathP")
     work_path_flag = _generate_unique_flag("WorkPath")
+    default_psh_executable_flag = _generate_unique_flag("DefaultPowerShellExecutable")
+    psh_executable_flag = _generate_unique_flag("PowerShellExecutable")
     content = r"""
 @echo off
 @setlocal DisableDelayedExpansion
@@ -49,8 +52,30 @@ set "{{WorkPath}}=%~dp0"
 set "{{POWERSHELL_CODE_ARGS_FLAG}}=%*"
 if "%{{WorkPath}}:~-1%"=="\" set "{{WorkPath}}=%{{WorkPath}}:~0,-1%"
 set "BAT_SCRIPT_ROOT=%{{WorkPath}}%"
-cmd /c "powershell -ExecutionPolicy Bypass -nop -c ""$f = [System.IO.File]::ReadAllText('%{{BatFilePathP}}%') -split ':{{POWERSHELL_CODE_EXEC_FLAG}}\:.*'; . ([scriptblock]::Create($f[1])) -BatchPath '%{{BatFilePathP}}%'" "
-if !errorlevel!==0 (
+set "{{DefaultPowerShellExecutable}}={{DefaultPowerShellExecutableVal}}"
+if "%{{DefaultPowerShellExecutable}}%" == "" (
+    where powershell >nul 2>1
+    if %ERRORLEVEL% == 0 (
+        set "{{PowerShellExecutable}}=powershell"
+        goto :ExecCode
+    )
+    where pwsh >nul 2>1
+    if %ERRORLEVEL% == 0 (
+        set "{{PowerShellExecutable}}=pwsh"
+        goto :ExecCode
+    )
+) else (
+    set "{{PowerShellExecutable}}=%{{DefaultPowerShellExecutable}}%"
+)
+:ExecCode
+if "%{{PowerShellExecutable}}%" == "" (
+    echo PowerShell Executable Not Found
+    pause
+    set "_psh_exit_code_=1"
+    goto :ExitCode
+)
+cmd /c " "%{{PowerShellExecutable}}%" -ExecutionPolicy Bypass -nop -c ""$f = [System.IO.File]::ReadAllText('%{{BatFilePathP}}%') -split ':{{POWERSHELL_CODE_EXEC_FLAG}}\:.*'; try { . ([scriptblock]::Create($f[1])) -BatchPath '%{{BatFilePathP}}%' } catch { $_; exit 1 } " "
+if %ERRORLEVEL% == 0 (
     set "_psh_exit_code_=0"
 ) else (
     set "_psh_exit_code_=1"
@@ -191,6 +216,8 @@ function Main {
         $Env:{{BatFilePathP}} = $null
         $Env:{{WorkPath}} = $null
         $Env:{{POWERSHELL_CODE_ARGS_FLAG}} = $null
+        $Env:{{DefaultPowerShellExecutable}} = $null
+        $Env:{{PowerShellExecutable}} = $null
         Invoke-Expression "& `"$temp_script_path`" $(Get-ExtraArgs)"
     }
     finally {
@@ -207,7 +234,7 @@ Main
 
 
 :ExitCode
-    exit /b %_psh_exit_code_%
+exit /b %_psh_exit_code_%
 """
     content = (
         content.replace("{{POWERSHELL_CODE_EXEC_FLAG}}", psh_exec_flag)
@@ -216,6 +243,9 @@ Main
         .replace("{{BatFilePath}}", bat_file_path_flag)
         .replace("{{BatFilePathP}}", bat_file_path_p_flag)
         .replace("{{WorkPath}}", work_path_flag)
+        .replace("{{DefaultPowerShellExecutable}}", default_psh_executable_flag)
+        .replace("{{PowerShellExecutable}}", psh_executable_flag)
+        .replace("{{DefaultPowerShellExecutableVal}}", executable if executable is not None else "")
         .replace("{{POWERSHELL_CODE}}", code)
         .strip()
     )
@@ -267,14 +297,14 @@ def replace_ps_root_to_env(text: str) -> str:
         str: 替换后的字符串
     """
     # 模式说明:
-    # 1. ('.*?') : 匹配单引号字符串（捕获组1）
-    # 2. (`\$\{.*?\}`|`\$\w+): 匹配反引号转义的变量（捕获组2）
-    # 3. \$\{(?:(\w+):)?PSScriptRoot\} : 匹配带花括号的变量（捕获组3）
-    # 4. \$(?:(\w+):)?PSScriptRoot\b : 匹配普通变量（捕获组4）
+    # 1. ('.*?') : 匹配单引号字符串 (捕获组1)
+    # 2. (`\$\{.*?\}`|`\$\w+): 匹配反引号转义的变量 (捕获组2)
+    # 3. \$\{(?:(\w+):)?PSScriptRoot\} : 匹配带花括号的变量 (捕获组3)
+    # 4. \$(?:(\w+):)?PSScriptRoot\b : 匹配普通变量 (捕获组4)
     pattern = r"('.*?')|(`\$(?:\{.*?\})?|`\$\w+)|(\$\{(?:\w+:)?PSScriptRoot\})|(\$(?:\w+:)?PSScriptRoot\b)"
 
     def subst(match: re.Match) -> Any:
-        # 如果是单引号字符串或转义字符，原样返回
+        # 如果是单引号字符串或转义字符, 原样返回
         if match.group(1) or match.group(2):
             return match.group(0)
         # 如果是带花括号的格式
@@ -296,7 +326,7 @@ def replace_env_to_ps_root(text: str) -> str:
     Returns:
         str: 替换后的字符串
     """
-    # 模式说明：
+    # 模式说明:
     # 1. ('.*?') : 匹配单引号字符串
     # 2. (`\$\{.*?\}`|`\$\w+): 匹配反引号转义
     # 3. \$\{Env:BAT_SCRIPT_ROOT\} : 目标带括号格式

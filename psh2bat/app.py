@@ -69,7 +69,10 @@ def run_app() -> None:
         )
         logger.info("Bst 脚本转换为 PowerShell 脚本: %s -> %s", input_path, save_path)
     else:
-        content = psh_to_bat_code(code)
+        content = psh_to_bat_code(
+            code=code,
+            executable=args.executable,
+        )
         save_file(
             content=content,
             save_path=save_path,

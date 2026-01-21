@@ -30,13 +30,13 @@ pip install psh2bat
 
 ## PowerShell 转 Bat
 ```bash
-psh2bat <Bat 脚本路径> --output-path <导出路径>
+psh2bat <PowerShell 脚本路径> --output-path <导出路径>
 ```
 
 
 ## Bat 转 PowerShell
 ```bash
-psh2bat <PowerShell 脚本路径> --output-path <导出路径> --reverse
+psh2bat <Bat 脚本路径> --output-path <导出路径> --reverse
 ```
 
 >[!IMPORTANT]  

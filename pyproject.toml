@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [project.scripts]
-"psh2bat" = "psh2bat.main:main"
+"psh2bat" = "psh2bat.app:run_app"
 
 [tool.setuptools.packages.find]
 where = ["."]

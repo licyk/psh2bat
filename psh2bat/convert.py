@@ -55,12 +55,12 @@ set "BAT_SCRIPT_ROOT=%{{WorkPath}}%"
 set "{{DefaultPowerShellExecutable}}={{DefaultPowerShellExecutableVal}}"
 if "%{{DefaultPowerShellExecutable}}%" == "" (
     where pwsh >nul 2>&1
-    if %ERRORLEVEL% == 0 (
+    if not errorlevel 1 (
         set "{{PowerShellExecutable}}=pwsh"
         goto :ExecCode
     )
     where powershell >nul 2>&1
-    if %ERRORLEVEL% == 0 (
+    if not errorlevel 1 (
         set "{{PowerShellExecutable}}=powershell"
         goto :ExecCode
     )
@@ -75,11 +75,7 @@ if "%{{PowerShellExecutable}}%" == "" (
     goto :ExitCode
 )
 cmd /c " "%{{PowerShellExecutable}}%" -ExecutionPolicy Bypass -nop -c ""$f = [System.IO.File]::ReadAllText('%{{BatFilePathP}}%') -split ':{{POWERSHELL_CODE_EXEC_FLAG}}\:.*'; try { . ([scriptblock]::Create($f[1])) -BatchPath '%{{BatFilePathP}}%' } catch { $_; exit 1 } " "
-if %ERRORLEVEL% == 0 (
-    set "_psh_exit_code_=0"
-) else (
-    set "_psh_exit_code_=1"
-)
+set "_psh_exit_code_=%ERRORLEVEL%"
 goto :ExitCode
 
 :{{POWERSHELL_CODE_EXEC_FLAG}}:
